@@ -2,13 +2,56 @@
 
 En este documento se busca identificar de manera formal las debilidades estructurales y de diseño, asi como los code smells  que presenta el prototipo base del sistema. Aunque el código funciona ha acumulado mucha deuda técnica, lo que reduce drásticamente la mantenibilidad del software, dificulta futuras ampliaciones y vuelve al sistema frágil frente a cualquier cambio. Este análisis nos servirá como mapa de ruta para las refactorizaciones a realizar para que el c´pfigo logre esta basado en los principios SOLID y Clean Code.
 
-## Calidad externa vs. calidad interna
+## Calidad externa: Regular 🟡
 
-- **Calidad Externa (aceptable):** Es importante mencionar que, desde la perspectiva del usuario, el sistema cumple con las operaciones funcionales exigidas (crear, listar, cambiar estado y reportar) y los endpoints funcionan. Esto ultimo fue probado y verificado mediante la interfaz interactiva de Swagger (/docs). Lo cual se evidenciara en el modulo de pruebas a crear en el prpoximo sprint que nos serviran de base para registrar como funciona el sistema ahora en su etapa inicial y verificar no haber modificado su comportamiento despues del refactoring.
+Desde la perspectiva del usuario, el sistema cumple con las operaciones funcionales exigidas (crear, listar, cambiar estado y reportar) y los endpoints funcionan. Esto ultimo fue probado y verificado mediante la interfaz interactiva de Swagger (/docs). Lo cual se evidenciara con más profundidad en el modulo de pruebas a crear en el próximo sprint que nos serviran de base para registrar cómo funciona el sistema en su etapa inicial y verificar no haber modificado su comportamiento despues del refactoring.
 
-- **Calidad Interna (deficiente):**  nivel interno y estructural, el código presenta una alta deuda técnica. Todo el modelo de negocio, las validaciones, el manejo de archivos y las rutas están acoplados en un único archivo (`main.py`) y en una clase monolítica (`Gestor`), lo que impide la mantenibilidad y la escalabilidad.
+### Evidencia de Swagger
 
-## Code Smells
+A continuación se pone a disposición la evidancia de las pruebas en swagger
+
+#### Registro de una Solicitud Académica (`POST /solicitudes`)
+* **Descripción:** Al consultar el endpoint `POST /solicitudes` mediante la interfaz interactiva de Swagger UI (`/docs`), se observa que no despliega la caja de texto con el esquema JSON esperado. Esto se debe directamente a los *code smells* **S8 (Primitive Obsession)** y **S9 (Acoplamiento Fuerte)** presentes en el código base: el endpoint recibe un objeto genérico `request: Request` y procesa manualmente los datos mediante `await request.json()` sin definir un modelo de datos (Pydantic Schema). Como consecuencia, Swagger no puede deducir la estructura de entrada. 
+* **Resultado:** La funcionalidad del endpoint y el procesamiento de la solicitud se verifican enviando el cuerpo JSON mediante Postman, respondiendo correctamente con un código `200 OK`. Este comportamiento será corregido en los commits de refactorización (`C5` - Introduce Parameter Object / Pydantic Models) sin alterar la lógica de negocio. Además, se detectó el comportamiento actual frente a datos de entrada incorrectos:
+
+1. **Respuestas de Error basadas en Texto Plano:** Cuando se envían parámetros inválidos (por ejemplo, un tipo de trámite no permitido como `"analitico"` o una prioridad incorrecta como `"medio"`), la API procesa la validación interna y devuelve un mensaje de error plano en formato de texto dentro del JSON (`"msg": "error tipo"` o `"msg": "error prioridad"`).
+2. **Inconsistencia en los Códigos de Estado HTTP:** Se observa que, ante un error de validación de negocio, el servidor responde con un código de estado HTTP **`200 OK`** en lugar de utilizar los códigos de error estándar de HTTP (como `400 Bad Request` o `422 Unprocessable Entity`). 
+3. **Ausencia de Excepciones Formales:** El sistema utiliza retornos condicionales en cadena y bloques de captura genéricos (`except:`) que silencian o manejan los errores de manera precaria.
+
+
+#### Consulta y Filtrado de Solicitudes (`GET /solicitudes`)
+* **Descripción:** Permite listar todas las solicitudes registradas o aplicar filtros opcionales por estado, tipo, prioridad o DNI.
+* **Resultado:** Código `200 OK` retornando una lista estructurada en formato JSON con los registros almacenados en `datos.json`.
+
+
+#### Búsqueda de Solicitud por ID (`GET /solicitudes/{id}`)
+* **Descripción:** Consulta el detalle específico de una solicitud a partir de su identificador numérico.
+* **Resultado:** Código `200 OK` si el registro existe, o un código HTTP `404 Not Found` en caso de que el ID no se encuentre en el sistema.
+
+
+#### Actualización del Estado de la Solicitud (`PUT /solicitudes/{id}/estado`)
+* **Descripción:** Busca permitir transicionar el estado del trámite (de `"pendiente"` a `"en proceso"` o `"resuelta"`), aplicando las validaciones internas de negocio.
+**Descripción:** Los métodos de actualización presentan las mismas limitaciones estructurales identificadas en los métodos `POST`. Al recibir un objeto `request: Request` genérico, la interfaz de Swagger UI no puede inferir el esquema de entrada requerido.
+* **Resultado:** Al igual que en el registro, ante fallas de validación de negocio o ausencia de datos, el sistema captura las excepciones de forma precaria y responde con un código HTTP **`200 OK`** acompañado de un mensaje plano de error (`{"ok": false, "msg": "error"}`), violando las buenas prácticas de diseño de APIs REST y los códigos de estado semánticos (como `400 Bad Request` o `404 Not Found`).
+
+
+#### Asignación de Responsable (`PUT /solicitudes/{id}/responsable`)
+* **Descripción:** Se usa para asociar un empleado administrativo o área responsable a una solicitud existente.
+**Descripción:** Los métodos de actualización presentan las mismas limitaciones estructurales identificadas en los métodos `POST`. Al recibir un objeto `request: Request` genérico, la interfaz de Swagger UI no puede inferir el esquema de entrada requerido.
+* **Resultado:** Al igual que en el registro, ante fallas de validación de negocio o ausencia de datos, el sistema captura las excepciones de forma precaria y responde con un código HTTP **`200 OK`** acompañado de un mensaje plano de error (`{"ok": false, "msg": "error"}`), violando las buenas prácticas de diseño de APIs REST y los códigos de estado semánticos (como `400 Bad Request` o `404 Not Found`).
+
+
+#### Listado de Responsables Disponibles (`GET /responsables`)
+* **Descripción:** Retorna el catálogo estático de áreas y operadores habilitados en el sistema (Alumnado, Títulos, Bedelía).
+* **Resultado:** Código `200 OK` con la lista completa de responsables.
+
+#### Generación de Reportes Estadísticos (`GET /reporte`)
+* **Descripción:** Calcula métricas globales del sistema (total de solicitudes, conteo por estado, porcentaje de resueltas y trámites prioritarios altos sin resolver).
+* **Resultado:** Código `200 OK` devolviendo el resumen estadístico consolidado.
+
+## Calidad Interna: Defectuosa 🔴
+
+A nivel interno y estructural, el código presenta una alta deuda técnica. Todo el modelo de negocio, las validaciones, el manejo de archivos y las rutas están acoplados en un único archivo (`main.py`) y en una clase monolítica (`Gestor`), lo que impide la mantenibilidad y la escalabilidad.
 A continuación se detallan los *code smells* (13) identificados en el estado inicial (`main.py`):
 
 #### S1 - God Class (Clase Monolítica)
@@ -62,3 +105,40 @@ A continuación se detallan los *code smells* (13) identificados en el estado in
 #### S13 - Código Muerto y Uso de Prints como Logs
 - **Ubicación:** Líneas 117, 206 (`print`) y línea 232 (`g = Gestor()` instanciado pero no utilizado en el endpoint `ver`).
 - **Qué significa:** Presencia de código que nunca se ejecuta y uso de consola (`print`) en lugar de un sistema de registro profesional (`logging`). Genera ruido visual y no aporta trazabilidad en producción.
+
+
+## Anexo
+
+### Evidencias de pruebas de endpoints
+
+1. Endpoint POST /solicitudes
+
+    * Prueba en Swagger de Endpoint POST /solicitudes que resulta en **200 SIN** body JSON: [Ver captura](./evidencias/pruebas-iniciales-endpoints/POST_solicitud.png)
+    * Prueba en POSTMAN de Endpoint POST /solicitudes que resulta en **200** **CON** body JSON: [Ver captura](./evidencias/pruebas-iniciales-endpoints/POST_solicitud_POSTMAN.png)
+    * Prueba en POSTMAN de Endpoint POST /solicitudes que resulta en **200 con mensaje de error de tipo**: [Ver captura](./evidencias/pruebas-iniciales-endpoints/POST_solicitud_POSTMAN_datos_invalidos_tipo.png)
+    * Prueba en POSTMAN de Endpoint POST /solicitudes que resulta en **200 con mensaje de error de prioridad**: [Ver captura](./evidencias/pruebas-iniciales-endpoints/POST_solicitud_POSTMAN_datos_invalidos_prioridad.png)
+
+2. Endpoint GET /solicitudes con o sin query
+
+    * Vista en Swagger UI con codigo 200: [Ver captura](./evidencias/pruebas-iniciales-endpoints/GET_solicitudes.png)
+    * Vista en Postman con codigo 200: [Ver captura](./evidencias/pruebas-iniciales-endpoints/GET_solicitudes_POSTMAN.png)
+    * Filtrado por DNI en Postman con codigo 200: [Ver captura](./evidencias/pruebas-iniciales-endpoints/GET_solicitudes_query_POSTMAN.png)
+
+
+3. Endpoint GET /solicitudes/{id}/estado
+
+    * Actualización por ID en Swagger UI  con codigo **200 SIN** body JSON y mensaje de error: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_ESTADO.png)
+    * Actualización por ID en Swagger UI  con codigo **200 CON** body JSON en Postman: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_ESTADO_POSTMAN.png.png)
+    * Actualización por ID en Swagger UI  con codigo **200 CON** body JSON con **DATOS INVÁLIDOS** en Postman: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_ESTADO_POSTMAN_datos_invalidos.png.png)
+
+4. Endpoint PUT /solicitudes/{id}/responsable
+
+    * Actualización por ID en Swagger UI  con codigo en **200 SIN** body JSON y mensaje de error: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_RESPONSABLE.png)
+    * Actualización por ID en Swagger UI  con codigo **200 CON** body JSON en Postman: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_RESPONSABLE_POSTMAN.png.png)
+    * Actualización por ID en Swagger UI  con codigo **200 CON** body JSON con **DATOS INVÁLIDOS** en Postman: [Ver captura](./evidencias/pruebas-iniciales-endpoints/PUT_ID_RESPONSABLE_POSTMAN_datos_invalidos.png.png)
+
+5. Endpoint GET /responsables
+    * Vista en Swagger UI con codigo 200: [Ver captura](./evidencias/pruebas-iniciales-endpoints/GET_responsables.png)
+
+6. Endpoint GET /reporte
+    * Vista en Swagger UI con codigo 200: [Ver captura](./evidencias/pruebas-iniciales-endpoints/GET_reporte.png)

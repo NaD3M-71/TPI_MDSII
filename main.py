@@ -92,7 +92,6 @@ class Gestor:                      ## S1 - GOD CLASS
                     id_resp = r["id"]
         s = {                              ## S8 - PRIMITIVE OBSESSION (Uso masivo de diccionarios planos)
             "id": cont,
-            "id": cont,
             "estudiante_id": est_id,
             "nombre": nombre,
             "apellido": apellido,
