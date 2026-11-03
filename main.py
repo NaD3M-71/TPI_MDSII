@@ -7,18 +7,18 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 ARCH = "datos.json"
-solicitudes = []
-estudiantes = []
+solicitudes = []  ## S2 - ESTADO GLOBAL MUTABLE
+estudiantes = []  ## S2 - ESTADO GLOBAL MUTABLE
 responsables = [
     {"id": 1, "nombre": "Laura Gomez", "area": "Alumnado"},
     {"id": 2, "nombre": "Carlos Perez", "area": "Titulos"},
     {"id": 3, "nombre": "Marta Diaz", "area": "Bedelia"},
 ]
-cont = 0
-cont_est = 0
+cont = 0        ## S2 - ESTADO GLOBAL MUTABLE
+cont_est = 0    ## S2 - ESTADO GLOBAL MUTABLE
 
 
-class Gestor:
+class Gestor:                      ## S1 - GOD CLASS
     def __init__(self):
         global solicitudes, estudiantes, cont, cont_est
         if os.path.exists(ARCH):
@@ -29,23 +29,28 @@ class Gestor:
                 estudiantes = d["estudiantes"]
                 cont = d["cont"]
                 cont_est = d["cont_est"]
-            except:
-                pass
+            except: 
+                pass    ## S7 - MANEJO DE ERRORES DEFICIENTE (except vacío)
 
     def guardar(self):
         try:
             f = open(ARCH, "w")
             f.write(json.dumps({"solicitudes": solicitudes, "estudiantes": estudiantes, "cont": cont, "cont_est": cont_est}))
         except:
-            pass
+            pass        ## S7 - MANEJO DE ERRORES DEFICIENTE (except vacío)
 
+
+    ## S2 - LONG METHOD (función extensa, realiza múltiples tareas)
+    ## S3 - LONG PARAMETER LIST (demasiados parámetros)
     def registrar(self, nombre, apellido, dni, email, legajo, carrera, tipo, prioridad, detalle, resp):
-        global cont, cont_est
-        if nombre == None or nombre == "":
+        
+        global cont, cont_est        ## S2 - USO DE GLOBAL
+       
+        if nombre == None or nombre == "": ## S10 - CONDICIONALES EXTENSOS
             return "error nombre"
         if apellido == None or apellido == "":
             return "error apellido"
-        if dni == None or len(str(dni)) < 7 or len(str(dni)) > 8:
+        if dni == None or len(str(dni)) < 7 or len(str(dni)) > 8:   ## S5 - MAGIC NUMBERS
             return "error dni"
         if email == None or "@" not in email:
             return "error email"
@@ -53,7 +58,7 @@ class Gestor:
             return "error tipo"
         if prioridad != "baja" and prioridad != "media" and prioridad != "alta":
             return "error prioridad"
-        if detalle == None or len(detalle) < 10:
+        if detalle == None or len(detalle) < 10:     ## S5 - MAGIC NUMBERS
             return "error detalle"
         est_id = 0
         for e in estudiantes:
@@ -63,7 +68,7 @@ class Gestor:
             cont_est = cont_est + 1
             estudiantes.append({"id": cont_est, "nombre": nombre, "apellido": apellido, "dni": str(dni), "email": email, "legajo": legajo, "carrera": carrera})
             est_id = cont_est
-        if tipo == "certificado":
+        if tipo == "certificado":      ## S5 - MAGIC NUMBERS & S10 - CONDICIONALES EXTENSOS
             plazo = 5
         elif tipo == "equivalencia":
             plazo = 30
@@ -85,7 +90,7 @@ class Gestor:
                 if r["id"] == resp:
                     nombre_resp = r["nombre"]
                     id_resp = r["id"]
-        s = {
+        s = {                              ## S8 - PRIMITIVE OBSESSION (Uso masivo de diccionarios planos)
             "id": cont,
             "estudiante_id": est_id,
             "nombre": nombre,
@@ -106,9 +111,10 @@ class Gestor:
         }
         solicitudes.append(s)
         self.guardar()
-        print("solicitud registrada " + str(cont))
-        return s
+        print("solicitud registrada " + str(cont))  ## S13 - PRINT COMO LOG Y CÓDIGO MUERTO/MENSAJES EN CONSOLA
+        return s  ## S11 - TIPO DE RETORNO INCONSISTENTE (devuelve dict o str)
 
+    ## S2 - LONG METHOD (función extensa, realiza múltiples tareas)
     def cambiar_estado(self, id, estado):
         for s in solicitudes:
             if s["id"] == id:
@@ -146,11 +152,11 @@ class Gestor:
                 return "error responsable"
         return None
 
-    def listar(self, estado, tipo, prioridad, dni):
+    def listar(self, estado, tipo, prioridad, dni):   ## S6 - CÓDIGO DUPLICADO (Filtros repetidos)
         res = []
         for s in solicitudes:
             ok = True
-            if estado != None and estado != "":
+            if estado != None and estado != "":    
                 if s["estado"] != estado:
                     ok = False
             if tipo != None and tipo != "":
@@ -167,7 +173,7 @@ class Gestor:
         return res
 
     def reporte(self):
-        p = 0
+        p = 0         ## S12 - NOMBRES POCO DESCRIPTIVOS (Variables de una sola letra)
         e = 0
         r = 0
         for s in solicitudes:
@@ -192,24 +198,24 @@ class Gestor:
 async def crear(request: Request):
     try:
         b = await request.json()
-        g = Gestor()
+        g = Gestor()                    ## S9 - ACOPLAMIENTO FUERTE (Instanciación directa en cada endpoint)
         r = g.registrar(b.get("nombre"), b.get("apellido"), b.get("dni"), b.get("email"), b.get("legajo"), b.get("carrera"), b.get("tipo"), b.get("prioridad"), b.get("detalle"), b.get("responsable_id"))
         if type(r) == str:
             return {"ok": False, "msg": r}
         return {"ok": True, "solicitud": r}
-    except Exception as e:
+    except Exception as e:              ## S7 - MANEJO DE ERRORES DEFICIENTE (Atrapa todo y responde 200 con mensaje genérico)
         return {"ok": False, "msg": "error"}
 
 
 @app.get("/solicitudes")
 def listar(estado: str = None, tipo: str = None, prioridad: str = None, dni: str = None):
-    g = Gestor()
+    g = Gestor()                         ## S9 - ACOPLAMIENTO FUERTE
     return g.listar(estado, tipo, prioridad, dni)
 
 
 @app.get("/solicitudes/{id}")
 def ver(id: int):
-    g = Gestor()
+    g = Gestor()   ## S13 - CÓDIGO MUERTO (g se instancia pero no se usa, saltea a lista global)
     for s in solicitudes:
         if s["id"] == id:
             return s
@@ -228,7 +234,7 @@ async def estado(id: int, request: Request):
             return {"ok": False, "msg": r}
         return {"ok": True, "solicitud": r}
     except:
-        return {"ok": False, "msg": "error"}
+        return {"ok": False, "msg": "error"}  ## S7 - MANEJO DE ERRORES DEFICIENTE
 
 
 @app.put("/solicitudes/{id}/responsable")
@@ -243,16 +249,16 @@ async def responsable(id: int, request: Request):
             return {"ok": False, "msg": r}
         return {"ok": True, "solicitud": r}
     except:
-        return {"ok": False, "msg": "error"}
+        return {"ok": False, "msg": "error"}  ## S7 - MANEJO DE ERRORES DEFICIENTE
 
 
 @app.get("/responsables")
-def resps():
+def resps():               ## S12 - NOMBRES POCO DESCRIPTIVOS (Función abreviada)
     return responsables
 
 
 @app.get("/reporte")
-def rep():
+def rep():                 ## S12 - NOMBRES POCO DESCRIPTIVOS (Función abreviada)
     g = Gestor()
     return g.reporte()
 
