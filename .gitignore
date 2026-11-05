@@ -11,3 +11,6 @@ __pycache__/
 # Directorios de IDEs
 .vscode/
 .idea/
+
+# Datos generados en pruebas de endpoints
+datos.json
