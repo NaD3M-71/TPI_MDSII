@@ -3,21 +3,42 @@ from fastapi.responses import JSONResponse
 
 from repositories.solicitudes_repository import SolicitudesRepository
 from services.solicitudes_service import SolicitudesService
+from fastapi import APIRouter, HTTPException, status
+from schemas.solicitudes import SolicitudCreate
 
 router = APIRouter()
 
 
-@router.post("/solicitudes")
-async def crear(request: Request):
+@router.post("/solicitudes", status_code=status.HTTP_201_CREATED)
+async def crear(solicitud: SolicitudCreate):
     try:
-        b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())     ## S9 - ACOPLAMIENTO FUERTE (Instanciación directa en cada endpoint)
-        r = g.registrar(b.get("nombre"), b.get("apellido"), b.get("dni"), b.get("email"), b.get("legajo"), b.get("carrera"), b.get("tipo"), b.get("prioridad"), b.get("detalle"), b.get("responsable_id"))
-        if type(r) == str:
-            return {"ok": False, "msg": r}
+        g = SolicitudesService(SolicitudesRepository())
+        
+        # Pasamos los datos validados por el esquema Pydantic
+        r = g.registrar(
+            solicitud.nombre, solicitud.apellido, solicitud.dni, 
+            solicitud.email, solicitud.legajo, solicitud.carrera, 
+            solicitud.tipo, solicitud.prioridad, solicitud.detalle, 
+            solicitud.responsable_id
+        )
+        
+        # Si el servicio retorna un string de error de negocio, lanzamos 400 Bad Request
+        if isinstance(r, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=r
+            )
+            
         return {"ok": True, "solicitud": r}
-    except Exception as e:              ## S7 - MANEJO DE ERRORES DEFICIENTE (Atrapa todo y responde 200 con mensaje genérico)
-        return {"ok": False, "msg": "error"}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        # Reemplazamos el viejo "ok: false" con estado 200 por una excepción 400/500 formal
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )
 
 
 @router.get("/solicitudes")
