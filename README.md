@@ -23,12 +23,20 @@ El sistema es una API monolítica desarrollada en FastAPI que gestiona solicitud
    ```bash
    git checkout estado-inicial
    ```
-2. Instalar las dependencias:
+2. Crear un entorno virtual de Python:
+   ```bash
+   python -m venv .venv
+   ```
+3. Activar el entorno virtual:
+   ```bash
+   .venv\Scripts\Activate.ps1
+   ```
+4. Instalar todas las librerías y dependencias:
    ```bash
    pip install -r requirements.txt
    ```
-3. Ejecutar la aplicación:
+5. Iniciar el servidor de desarrollo de FastAPI utilizando el archivo principal de la aplicación (main.py):
    ```bash
-   python main.py
+   python -m fastapi dev main.py
    ```
 
