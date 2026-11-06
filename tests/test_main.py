@@ -79,6 +79,10 @@ def test_crear_solicitud_tipo_invalido():
       o 422 Unprocessable Entity). Cuando eso ocurra, esta prueba fallará a propósito, 
       exigiéndonos actualizarla para reflejar la mejora en la calidad interna.
     """
+    """
+    Verifica que el sistema rechace un tipo de trámite inválido 
+    con un código HTTP semántico (422 Unprocessable Entity por validación de Enum en Pydantic).
+    """
     payload = {
         "nombre": "Laura",
         "apellido": "Ramirez",
@@ -94,10 +98,12 @@ def test_crear_solicitud_tipo_invalido():
     response = client.post("/solicitudes", json=payload)
     
     # Afirmamos el comportamiento actual (aunque conceptualmente sea una mala práctica)
-    assert response.status_code == 200
+    #modificacion Actualizado: Esperamos 422 por validación estricta de Pydantic (agus)
+    assert response.status_code == 422
     data = response.json()
-    assert data["ok"] is False
-    assert "error tipo" in data["msg"]
+    assert "detail" in data  # Pydantic devuelve detalles de validación en 'detail'
+    ##assert data["ok"] is False
+    ##assert "error tipo" in data["msg"]
 
 
 def test_crear_solicitud_prioridad_invalida():
@@ -108,6 +114,10 @@ def test_crear_solicitud_prioridad_invalida():
     - Por qué fallará después el refactor: Al igual que el test anterior, se espera que 
       el sistema devuelva un código HTTP de error semántico (400/422). Esta prueba 
       actuará como disparador para comprobar que mejoramos el manejo de excepciones.
+    """
+    """
+    Verifica que el sistema rechace una prioridad inválida 
+    con un código HTTP semántico (422 Unprocessable Entity por validación de Enum en Pydantic).
     """
     payload = {
         "nombre": "Laura",
@@ -122,8 +132,10 @@ def test_crear_solicitud_prioridad_invalida():
         "responsable_id": 2
     }
     response = client.post("/solicitudes", json=payload)
-    
-    assert response.status_code == 200
+    # modificacion Actualizado: Esperamos 422 por validación estricta de Pydantic (agustin)
+    assert response.status_code == 422
     data = response.json()
-    assert data["ok"] is False
-    assert "error prioridad" in data["msg"]
+    assert "detail" in data  # Pydantic devuelve detalles de validación en 'detail'
+    ##assert data["ok"] is False
+    ##assert "error prioridad" in data["msg"]
+    
