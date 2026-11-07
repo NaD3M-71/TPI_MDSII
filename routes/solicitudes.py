@@ -29,7 +29,7 @@ async def crear(solicitud: SolicitudCreate):
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=str(e)
         )
 
@@ -73,7 +73,7 @@ async def estado(id: int, request: Request):
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=str(e)
         )
 
@@ -102,6 +102,6 @@ async def responsable(id: int, request: Request):
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=str(e)
         )
