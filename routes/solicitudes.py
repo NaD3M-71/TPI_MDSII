@@ -1,28 +1,42 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from repositories.solicitudes_repository import SolicitudesRepository
 from services.solicitudes_service import SolicitudesService
+from schemas.solicitudes import SolicitudCreate
 
 router = APIRouter()
 
 
-@router.post("/solicitudes")
-async def crear(request: Request):
+@router.post("/solicitudes", status_code=status.HTTP_201_CREATED)
+async def crear(solicitud: SolicitudCreate):
     try:
-        b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())     ## S9 - ACOPLAMIENTO FUERTE (Instanciación directa en cada endpoint)
-        r = g.registrar(b.get("nombre"), b.get("apellido"), b.get("dni"), b.get("email"), b.get("legajo"), b.get("carrera"), b.get("tipo"), b.get("prioridad"), b.get("detalle"), b.get("responsable_id"))
-        if type(r) == str:
-            return {"ok": False, "msg": r}
+        g = SolicitudesService(SolicitudesRepository())
+        
+        # Pasamos el objeto solicitud completo (o solicitud.model_dump() / solicitud.dict() según corresponda)
+        r = g.registrar(solicitud)
+        
+        # Si el servicio retorna un string de error de negocio, lanzamos 400 Bad Request
+        if isinstance(r, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=r
+            )
+            
         return {"ok": True, "solicitud": r}
-    except Exception as e:              ## S7 - MANEJO DE ERRORES DEFICIENTE (Atrapa todo y responde 200 con mensaje genérico)
-        return {"ok": False, "msg": "error"}
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )
 
 
 @router.get("/solicitudes")
 def listar(estado: str = None, tipo: str = None, prioridad: str = None, dni: str = None):
-    g = SolicitudesService(SolicitudesRepository())     ## S9 - ACOPLAMIENTO FUERTE
+    g = SolicitudesService(SolicitudesRepository())    ## S9 - ACOPLAMIENTO FUERTE
     return g.listar(estado, tipo, prioridad, dni)
 
 
@@ -32,7 +46,7 @@ def ver(id: int):
     for s in repo.solicitudes:
         if s["id"] == id:
             return s
-    return JSONResponse(status_code=404, content={"msg": "no existe"})
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe la solicitud")
 
 
 @router.put("/solicitudes/{id}/estado")
@@ -40,14 +54,28 @@ async def estado(id: int, request: Request):
     try:
         b = await request.json()
         g = SolicitudesService(SolicitudesRepository())
-        r = g.cambiar_estado(id, b["estado"])
-        if r == None:
-            return JSONResponse(status_code=404, content={"msg": "no existe"})
-        if type(r) == str:
-            return {"ok": False, "msg": r}
+        r = g.cambiar_estado(id, b.get("estado"))
+        
+        if r is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="No existe la solicitud"
+            )
+        if isinstance(r, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=r
+            )
+            
         return {"ok": True, "solicitud": r}
-    except:
-        return {"ok": False, "msg": "error"}  ## S7 - MANEJO DE ERRORES DEFICIENTE
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )
 
 
 @router.put("/solicitudes/{id}/responsable")
@@ -55,11 +83,25 @@ async def responsable(id: int, request: Request):
     try:
         b = await request.json()
         g = SolicitudesService(SolicitudesRepository())
-        r = g.asignar(id, b["responsable_id"])
-        if r == None:
-            return JSONResponse(status_code=404, content={"msg": "no existe"})
-        if type(r) == str:
-            return {"ok": False, "msg": r}
+        r = g.asignar(id, b.get("responsable_id"))
+        
+        if r is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="No existe la solicitud"
+            )
+        if isinstance(r, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, 
+                detail=r
+            )
+            
         return {"ok": True, "solicitud": r}
-    except:
-        return {"ok": False, "msg": "error"}  ## S7 - MANEJO DE ERRORES DEFICIENTE
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=str(e)
+        )

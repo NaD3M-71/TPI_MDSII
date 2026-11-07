@@ -33,7 +33,9 @@ def test_crear_solicitud_valida():
         "responsable_id": 1
     }
     response = client.post("/solicitudes", json=payload)
-    assert response.status_code == 200
+    print("DETALLE TI ERROR 400:", response.json())
+    # Actualizado: Esperamos 201 Created según la definición del endpoint
+    assert response.status_code == 201
     data = response.json()
     assert data["ok"] is True
     assert "solicitud" in data
@@ -70,14 +72,8 @@ def test_obtener_reporte():
     
 def test_crear_solicitud_tipo_invalido():
     """
-    Caracteriza el manejo de errores inicial: ante un tipo de trámite inválido.
-    - Qué testea: Demuestra el manejo de errores deficiente actual. Ante un tipo de 
-      trámite inválido ('analitico'), el sistema responde con HTTP 200 OK (incorrecto 
-      para un error de validación) y un mensaje de texto plano en el JSON ('ok': false).
-    - Por qué fallará después el refactor: Al corregir el diseño y aplicar excepciones de dominio,
-      el sistema deberá rechazar la petición con un código HTTP estándar (como 400 Bad Request 
-      o 422 Unprocessable Entity). Cuando eso ocurra, esta prueba fallará a propósito, 
-      exigiéndonos actualizarla para reflejar la mejora en la calidad interna.
+    Verifica que el sistema rechace un tipo de trámite inválido 
+    con un código HTTP semántico (422 Unprocessable Entity por validación de Enum en Pydantic).
     """
     payload = {
         "nombre": "Laura",
@@ -93,21 +89,16 @@ def test_crear_solicitud_tipo_invalido():
     }
     response = client.post("/solicitudes", json=payload)
     
-    # Afirmamos el comportamiento actual (aunque conceptualmente sea una mala práctica)
-    assert response.status_code == 200
+    # Actualizado: Esperamos 422 por validación estricta de Pydantic
+    assert response.status_code == 422
     data = response.json()
-    assert data["ok"] is False
-    assert "error tipo" in data["msg"]
+    assert "detail" in data  # Pydantic devuelve detalles de validación en 'detail'
 
 
 def test_crear_solicitud_prioridad_invalida():
     """
-    Caracteriza el manejo de errores inicial ante una prioridad inválida.
-    - Qué testea: Comportamiento inicial ante una prioridad inválida ('medio'). 
-      Devuelve HTTP 200 OK con un mensaje plano de error.
-    - Por qué fallará después el refactor: Al igual que el test anterior, se espera que 
-      el sistema devuelva un código HTTP de error semántico (400/422). Esta prueba 
-      actuará como disparador para comprobar que mejoramos el manejo de excepciones.
+    Verifica que el sistema rechace una prioridad inválida 
+    con un código HTTP semántico (422 Unprocessable Entity por validación de Enum en Pydantic).
     """
     payload = {
         "nombre": "Laura",
@@ -123,7 +114,8 @@ def test_crear_solicitud_prioridad_invalida():
     }
     response = client.post("/solicitudes", json=payload)
     
-    assert response.status_code == 200
+    # Actualizado: Esperamos 422 por validación estricta de Pydantic
+    assert response.status_code == 422
     data = response.json()
-    assert data["ok"] is False
-    assert "error prioridad" in data["msg"]
+    assert "detail" in data  # Pydantic devuelve detalles de validación en 'detail'
+
