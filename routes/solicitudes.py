@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from repositories.solicitudes_repository import SolicitudesRepository
 from schemas.solicitudes import SolicitudCreate
@@ -7,25 +7,39 @@ from services.solicitudes_service import SolicitudesService
 router = APIRouter()
 
 
-@router.post("/solicitudes", status_code=status.HTTP_201_CREATED)
-async def crear(solicitud: SolicitudCreate):
-    try:
-        g = SolicitudesService(SolicitudesRepository())
+# Función de dependencia para evitar el acoplamiento
+def obtener_servicio_solicitudes() -> SolicitudesService:
+    repositorio = SolicitudesRepository()
+    return SolicitudesService(repositorio)
 
-        # Pasamos el objeto solicitud completo (o solicitud.model_dump() / solicitud.dict() según corresponda)
-        r = g.registrar(solicitud)
+
+@router.post(
+    "/solicitudes",
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar una nueva solicitud",
+    description="Crea una solicitud académica validando datos mediante DTOs y reglas de negocio.",
+)
+async def crear_solicitud(
+    solicitud: SolicitudCreate,
+    servicio: SolicitudesService = Depends(obtener_servicio_solicitudes),
+):
+    try:
+        resultado_registro = servicio.registrar(solicitud)
 
         # Si el servicio retorna un string de error de negocio, lanzamos 400 Bad Request
-        if isinstance(r, str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=r)
+        if isinstance(resultado_registro, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=resultado_registro
+            )
 
-        return {"ok": True, "solicitud": r}
+        return resultado_registro  # enfoque REST: devuelve el recurso directamente en lugar del diccionario con la estructura {"ok": True)
 
-    except HTTPException as he:
-        raise he
-    except Exception as e:
+    except HTTPException as error_http:
+        raise error_http
+    except Exception as error_inesperado:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(error_inesperado)}",
         )
 
 
@@ -54,7 +68,9 @@ def ver(id: int):
 async def estado(id: int, request: Request):
     try:
         b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())
+        g = SolicitudesService(
+            SolicitudesRepository()
+        )  ## S9 - ACOPLAMIENTO FUERTE (Instanciación directa en cada endpoint)
         r = g.cambiar_estado(id, b.get("estado"))
 
         if r is None:
@@ -78,7 +94,9 @@ async def estado(id: int, request: Request):
 async def responsable(id: int, request: Request):
     try:
         b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())
+        g = SolicitudesService(
+            SolicitudesRepository()
+        )  ## S9 - ACOPLAMIENTO FUERTE (Instanciación directa en cada endpoint)
         r = g.asignar(id, b.get("responsable_id"))
 
         if r is None:
