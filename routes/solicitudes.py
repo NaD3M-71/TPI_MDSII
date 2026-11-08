@@ -1,107 +1,144 @@
-from fastapi import APIRouter, Request, HTTPException, status
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, status
 
-from repositories.solicitudes_repository import SolicitudesRepository
+from core.dependencies import obtener_servicio_solicitudes
+from schemas.solicitudes import EstadoUpdate, ResponsableUpdate, SolicitudCreate
 from services.solicitudes_service import SolicitudesService
-from schemas.solicitudes import SolicitudCreate
 
-router = APIRouter()
+# S9 - ACOPLAMIENTO FUERTE (Se centralizan los routers modularizados)
+router = APIRouter(prefix="/solicitudes", tags=["Solicitudes"])
 
 
-@router.post("/solicitudes", status_code=status.HTTP_201_CREATED)
-async def crear(solicitud: SolicitudCreate):
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Registrar una nueva solicitud",
+    description="Crea una solicitud académica validando datos mediante DTOs y reglas de negocio.",
+)
+async def crear_solicitud(
+    solicitud: SolicitudCreate,
+    # S9 - Eliminación de acoplamiento fuerte mediante Inyección de Dependencias (DI)
+    # y centralización de la creacion de servicios en dependencies.py
+    servicio: SolicitudesService = Depends(obtener_servicio_solicitudes),
+):
     try:
-        g = SolicitudesService(SolicitudesRepository())
-        
-        # Pasamos el objeto solicitud completo (o solicitud.model_dump() / solicitud.dict() según corresponda)
-        r = g.registrar(solicitud)
-        
+        resultado_registro = servicio.registrar(solicitud)
+
         # Si el servicio retorna un string de error de negocio, lanzamos 400 Bad Request
-        if isinstance(r, str):
+        if isinstance(resultado_registro, str):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail=r
+                status_code=status.HTTP_400_BAD_REQUEST, detail=resultado_registro
             )
-            
-        return {"ok": True, "solicitud": r}
-        
-    except HTTPException as he:
-        raise he
-    except Exception as e:
+
+        return resultado_registro  # enfoque REST: devuelve el recurso directamente en lugar del diccionario con la estructura {"ok": True)
+
+    except HTTPException as error_http:
+        raise error_http
+    except Exception as error_inesperado:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,  # S7 - MEJORA EN MANEJO DE ERRORES ( ahora evitamos excepciones genéricas silenciosas)
+            detail=f"Error interno: {str(error_inesperado)}",
         )
 
 
-@router.get("/solicitudes")
-def listar(estado: str = None, tipo: str = None, prioridad: str = None, dni: str = None):
-    g = SolicitudesService(SolicitudesRepository())    ## S9 - ACOPLAMIENTO FUERTE
-    return g.listar(estado, tipo, prioridad, dni)
-
-
-@router.get("/solicitudes/{id}")
-def ver(id: int):
-    repo = SolicitudesRepository()   ## S9 - ACOPLAMIENTO FUERTE (accede al repositorio sin pasar por el servicio)
-    for s in repo.solicitudes:
-        if s["id"] == id:
-            return s
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No existe la solicitud")
-
-
-@router.put("/solicitudes/{id}/estado")
-async def estado(id: int, request: Request):
+@router.get(
+    "",
+    summary="Listar solicitudes con filtros opcionales",
+    description="Permite filtrar las solicitudes por estado, tipo, prioridad o DNI.",
+)
+def listar_solicitudes(
+    estado: str = None,
+    tipo: str = None,
+    prioridad: str = None,
+    dni: str = None,
+    servicio: SolicitudesService = Depends(obtener_servicio_solicitudes),
+):
     try:
-        b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())
-        r = g.cambiar_estado(id, b.get("estado"))
-        
-        if r is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="No existe la solicitud"
-            )
-        if isinstance(r, str):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail=r
-            )
-            
-        return {"ok": True, "solicitud": r}
-        
-    except HTTPException as he:
-        raise he
-    except Exception as e:
+        return servicio.listar(estado, tipo, prioridad, dni)
+    except Exception as error_inesperado:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(error_inesperado)}",
         )
 
 
-@router.put("/solicitudes/{id}/responsable")
-async def responsable(id: int, request: Request):
+@router.get(
+    "/{id}",
+    summary="Ver detalle de una solicitud por ID",
+    description="Busca y retorna una solicitud específica según su identificador único.",
+)
+def ver_solicitud(
+    id: int, servicio: SolicitudesService = Depends(obtener_servicio_solicitudes)
+):
+    solicitudes = servicio.listar(servicio)
+    for solicitud in solicitudes:
+        if solicitud.get("id") == id:
+            return solicitud
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND, detail="No existe la solicitud"
+    )
+
+
+@router.put(
+    "/{id}/estado",
+    summary="Cambiar el estado de una solicitud",
+    description="Actualiza el estado actual de una solicitud existente.",
+)
+async def cambiar_estado_solicitud(
+    id: int,
+    datos_estado: EstadoUpdate,  # S12 - NOMBRES DESCRIPTIVOS
+    servicio: SolicitudesService = Depends(obtener_servicio_solicitudes),
+):
     try:
-        b = await request.json()
-        g = SolicitudesService(SolicitudesRepository())
-        r = g.asignar(id, b.get("responsable_id"))
-        
-        if r is None:
+        resultado = servicio.cambiar_estado(id, datos_estado.estado)
+
+        if resultado is None:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, 
-                detail="No existe la solicitud"
+                status_code=status.HTTP_404_NOT_FOUND, detail="No existe la solicitud"
             )
-        if isinstance(r, str):
+        if isinstance(resultado, str):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
-                detail=r
+                status_code=status.HTTP_400_BAD_REQUEST, detail=resultado
             )
-            
-        return {"ok": True, "solicitud": r}
-        
-    except HTTPException as he:
-        raise he
-    except Exception as e:
+
+        return resultado
+
+    except HTTPException as error_http:
+        raise error_http
+    except Exception as error_inesperado:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(error_inesperado)}",
+        )
+
+
+@router.put(
+    "/{id}/responsable",
+    summary="Asignar responsable a una solicitud",
+    description="Modifica o asigna el ID del responsable encargado de la solicitud.",
+)
+async def responsable(
+    id: int,
+    datos_responsable: ResponsableUpdate,
+    servicio: SolicitudesService = Depends(obtener_servicio_solicitudes),
+):
+    try:
+        resultado = servicio.asignar(id, datos_responsable.responsable_id)
+
+        if resultado is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="No existe la solicitud"
+            )
+        if isinstance(resultado, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=resultado
+            )
+
+        return resultado
+
+    except HTTPException as error_http:
+        raise error_http
+    except Exception as error_inesperado:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error interno: {str(error_inesperado)}",
         )

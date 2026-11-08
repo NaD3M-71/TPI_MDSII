@@ -1,0 +1,20 @@
+repos:
+  # Linter y Formateador (Ruff)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0  # Puedes usar la versión más reciente
+    hooks:
+      # Formatea el código automáticamente estilo Black
+      - id: ruff-format
+      # Detecta y corrige errores de estilo, imports y código muerto
+      - id: ruff
+        args: [--fix]
+
+  # Red de seguridad: Correr los tests antes de cada commit
+  - repo: local
+    hooks:
+      - id: pytest-check
+        name: pytest-check
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
