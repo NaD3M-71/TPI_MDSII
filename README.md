@@ -40,3 +40,10 @@ El sistema es una API monolítica desarrollada en FastAPI que gestiona solicitud
    python -m fastapi dev main.py
    ```
 
+## Ejecución de Pruebas (Tests)
+
+   Para correr la suite completa de pruebas unitarias y de integración con `pytest`, ejecuta el siguiente comando en la raíz del proyecto:
+
+   ```bash
+   pytest -v --cov=.
+   ```
